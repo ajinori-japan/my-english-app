@@ -1,4 +1,3 @@
-# ===== ここから書き換え =====
 import streamlit as st
 import google.generativeai as genai
 import json
@@ -10,16 +9,14 @@ import os
 # ==========================================
 st.set_page_config(page_title="English Exam Generator", layout="wide")
 st.title("📊 English Exam Generator")
-st.caption("Created by [あなたの名前]") # ←ここにかっこいい名前を入れてもOK
+st.caption("Common Test / University Entrance Exam Level") 
 
 # APIキーの取得（シークレット機能対応）
-# サーバーにキーが設定されていればそれを使い、なければ入力欄を出す
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
     st.sidebar.header("Settings")
     api_key = st.sidebar.text_input("Gemini API Key", type="password")
-# ===== ここまで書き換え =====
 
 # ==========================================
 # ロジックエリア
@@ -27,29 +24,20 @@ else:
 if api_key:
     genai.configure(api_key=api_key)
 
-    # --- モデル選択 ---
-    st.sidebar.subheader("Model Selection")
+    # --- モデル設定（gemini-3-flash-preview 固定）---
+    # 友達用に見やすくするため、サイドバーの選択肢は削除しました
+    target_model = 'gemini-3-flash-preview'
+    
     try:
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        model_names = [m.replace('models/', '') for m in models]
-        model_names.sort()
-        default_index = 0
-        for i, name in enumerate(model_names):
-            if "1.5-flash" in name:
-                default_index = i
-                break
-        
-        selected_model = st.sidebar.selectbox("Select Model", model_names, index=default_index)
-        
-        # JSONモード設定
+        # JSONモードを有効にしてモデルを初期化
         model = genai.GenerativeModel(
-            selected_model,
+            target_model,
             generation_config={"response_mime_type": "application/json"}
         )
     except Exception as e:
-        st.sidebar.error(f"Error fetching models: {e}")
+        # 万が一 3-flash が使えない時のフォールバック
+        st.error(f"指定されたモデル ({target_model}) が利用できません。設定を確認してください: {e}")
         model = genai.GenerativeModel('gemini-1.5-flash')
-    # -----------------------
 
     col1, col2 = st.columns([1, 1])
 
@@ -72,7 +60,7 @@ if api_key:
                 input_mime_type = "application/pdf"
                 st.success(f"PDF Loaded: {uploaded_file.name}")
 
-        generate_btn = st.button("Generate Long Exam", type="primary")
+        generate_btn = st.button("Generate Exam", type="primary")
 
     with col2:
         st.subheader("2. Generated Exam")
@@ -83,7 +71,7 @@ if api_key:
         if generate_btn and user_input_data:
             with st.spinner("Writing a long passage, creating data, and questions..."):
                 try:
-                    # ★修正ポイント：長文を指定し、設問数を増やす指示に変更
+                    # プロンプト
                     system_prompt = """
                     You are an expert English Exam Creator for the Japanese Common Test (Kyotsu Test).
                     Create a "Long Reading Comprehension with Chart Interpretation" problem.
@@ -115,10 +103,6 @@ if api_key:
                                 "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
                                 "answer": "Option 2",
                                 "explanation": "Explanation in Japanese..."
-                            },
-                            {
-                                "id": 2,
-                                ...
                             }
                         ]
                     }
@@ -141,7 +125,6 @@ if api_key:
         
         if data:
             st.markdown(f"### {data.get('title', 'No Title')}")
-            # 本文をスクロールできるようにするか、そのまま全表示
             st.write(data.get('passage', ''))
             
             st.markdown("---")
